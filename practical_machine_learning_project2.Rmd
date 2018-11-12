@@ -22,13 +22,14 @@ The five ways are exactly according to the specification (Class A), throwing the
 First, we load the required packages:
 
 ```{r echo = FALSE}
+library(randomForest)
 library(caret)
 library(rpart)
 library(rpart.plot)
 library(RColorBrewer)
 library(rattle)
-library(randomForest)
 library(gbm)
+library(doParallel)
 ```
 
 
@@ -88,27 +89,44 @@ dim(testing)
 
 ```
 
+We divide the training example into 80% training and 20 percent for cross validation.
 
+```{r}
+set.seed(1111)
+only_train <- createDataPartition(training$classe, p = 0.8, list = FALSE)
+cv_samples <- training[-only_train,]
+training <- training[only_train,]
+
+# Set trainControl parameters for cross-validation
+ctrl <- trainControl(method = "cv", verboseIter=FALSE, number=3)
+
+```
 
 # Prediction with Random Forest
 
 We use random forest for fitting a model and do prediction.
 
 ```{r cache = TRUE}
-controlRF <- trainControl(verboseIter=FALSE)
-modRF1 <- train(classe ~ ., data=training, method="rf")
-modRF1$finalModel
+modRF <- train(classe ~ ., data=training, method="rf", trControl = ctrl)
+modRF$finalModel
 ```
 
 ```{r}
-print(modRF1)
+print(modRF)
 ```
 
-The accuracy is almosty 1.
+The accuracy is almosty 1 on the training set.
+
+To estimate the out of sample error, lets try to predict the classe on the cross-validation set.
+
+```{r}
+pred <- predict(modRF, cv_samples)
+confusionMatrix(table(pred, cv_samples$classe))
+```
 
 Now let's see the predictions on the test set
 
 ```{r}
 # predict outcomes using validation set
-(predict_rf <- predict(modRF1, newdata=testing))
+(predict_rf <- predict(modRF, newdata=testing))
 ```

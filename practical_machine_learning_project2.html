@@ -138,22 +138,27 @@ $(document).ready(function () {
 <div id="data-loading-and-processing" class="section level1">
 <h1>Data Loading and Processing</h1>
 <p>First, we load the required packages:</p>
+<pre><code>## randomForest 4.6-14</code></pre>
+<pre><code>## Type rfNews() to see new features/changes/bug fixes.</code></pre>
 <pre><code>## Loading required package: lattice</code></pre>
 <pre><code>## Loading required package: ggplot2</code></pre>
+<pre><code>## 
+## Attaching package: 'ggplot2'</code></pre>
+<pre><code>## The following object is masked from 'package:randomForest':
+## 
+##     margin</code></pre>
 <pre><code>## Rattle: A free graphical interface for data science with R.
 ## Version 5.2.0 Copyright (c) 2006-2018 Togaware Pty Ltd.
 ## Type 'rattle()' to shake, rattle, and roll your data.</code></pre>
-<pre><code>## randomForest 4.6-14</code></pre>
-<pre><code>## Type rfNews() to see new features/changes/bug fixes.</code></pre>
 <pre><code>## 
-## Attaching package: 'randomForest'</code></pre>
-<pre><code>## The following object is masked from 'package:rattle':
+## Attaching package: 'rattle'</code></pre>
+<pre><code>## The following object is masked from 'package:randomForest':
 ## 
 ##     importance</code></pre>
-<pre><code>## The following object is masked from 'package:ggplot2':
-## 
-##     margin</code></pre>
 <pre><code>## Loaded gbm 2.1.4</code></pre>
+<pre><code>## Loading required package: foreach</code></pre>
+<pre><code>## Loading required package: iterators</code></pre>
+<pre><code>## Loading required package: parallel</code></pre>
 <p>We now load the training and testing data set from the source:</p>
 <pre class="r"><code>if(!file.exists(&quot;pml-training.csv&quot;)){
         train_url &lt;- &quot;https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv&quot;
@@ -309,51 +314,92 @@ str(training)</code></pre>
 <pre><code>## [1] 19622    53</code></pre>
 <pre class="r"><code>dim(testing)</code></pre>
 <pre><code>## [1] 20 53</code></pre>
+<p>We divide the training example into 80% training and 20 percent for cross validation.</p>
+<pre class="r"><code>set.seed(1111)
+only_train &lt;- createDataPartition(training$classe, p = 0.8, list = FALSE)
+cv_samples &lt;- training[-only_train,]
+training &lt;- training[only_train,]
+
+# Set trainControl parameters for cross-validation
+ctrl &lt;- trainControl(method = &quot;cv&quot;, verboseIter=FALSE, number=3)</code></pre>
 </div>
 <div id="prediction-with-random-forest" class="section level1">
 <h1>Prediction with Random Forest</h1>
 <p>We use random forest for fitting a model and do prediction.</p>
-<pre class="r"><code>controlRF &lt;- trainControl(verboseIter=FALSE)
-modRF1 &lt;- train(classe ~ ., data=training, method=&quot;rf&quot;)
-modRF1$finalModel</code></pre>
+<pre class="r"><code>modRF &lt;- train(classe ~ ., data=training, method=&quot;rf&quot;, trControl = ctrl)
+modRF$finalModel</code></pre>
 <pre><code>## 
 ## Call:
 ##  randomForest(x = x, y = y, mtry = param$mtry) 
 ##                Type of random forest: classification
 ##                      Number of trees: 500
-## No. of variables tried at each split: 27
+## No. of variables tried at each split: 2
 ## 
-##         OOB estimate of  error rate: 0.43%
+##         OOB estimate of  error rate: 0.54%
 ## Confusion matrix:
 ##      A    B    C    D    E  class.error
-## A 5576    2    1    0    1 0.0007168459
-## B   20 3771    5    1    0 0.0068475112
-## C    0    7 3405   10    0 0.0049678551
-## D    0    1   20 3191    4 0.0077736318
-## E    0    1    6    5 3595 0.0033268644</code></pre>
-<pre class="r"><code>print(modRF1)</code></pre>
+## A 4460    3    0    0    1 0.0008960573
+## B   18 3014    6    0    0 0.0078999342
+## C    0   13 2723    2    0 0.0054784514
+## D    0    0   37 2535    1 0.0147687524
+## E    0    0    0    4 2882 0.0013860014</code></pre>
+<pre class="r"><code>print(modRF)</code></pre>
 <pre><code>## Random Forest 
 ## 
-## 19622 samples
+## 15699 samples
 ##    52 predictor
 ##     5 classes: 'A', 'B', 'C', 'D', 'E' 
 ## 
 ## No pre-processing
-## Resampling: Bootstrapped (25 reps) 
-## Summary of sample sizes: 19622, 19622, 19622, 19622, 19622, 19622, ... 
+## Resampling: Cross-Validated (3 fold) 
+## Summary of sample sizes: 10466, 10467, 10465 
 ## Resampling results across tuning parameters:
 ## 
 ##   mtry  Accuracy   Kappa    
-##    2    0.9924139  0.9904057
-##   27    0.9925872  0.9906246
-##   52    0.9840520  0.9798297
+##    2    0.9910185  0.9886374
+##   27    0.9902543  0.9876703
+##   52    0.9844575  0.9803372
 ## 
 ## Accuracy was used to select the optimal model using the largest value.
-## The final value used for the model was mtry = 27.</code></pre>
-<p>The accuracy is almosty 1.</p>
+## The final value used for the model was mtry = 2.</code></pre>
+<p>The accuracy is almosty 1 on the training set.</p>
+<p>To estimate the out of sample error, lets try to predict the classe on the cross-validation set.</p>
+<pre class="r"><code>pred &lt;- predict(modRF, cv_samples)
+confusionMatrix(table(pred, cv_samples$classe))</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##     
+## pred    A    B    C    D    E
+##    A 1115    3    0    0    0
+##    B    1  756    6    0    0
+##    C    0    0  678   17    0
+##    D    0    0    0  626    2
+##    E    0    0    0    0  719
+## 
+## Overall Statistics
+##                                          
+##                Accuracy : 0.9926         
+##                  95% CI : (0.9894, 0.995)
+##     No Information Rate : 0.2845         
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16      
+##                                          
+##                   Kappa : 0.9906         
+##  Mcnemar's Test P-Value : NA             
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.9991   0.9960   0.9912   0.9736   0.9972
+## Specificity            0.9989   0.9978   0.9948   0.9994   1.0000
+## Pos Pred Value         0.9973   0.9908   0.9755   0.9968   1.0000
+## Neg Pred Value         0.9996   0.9991   0.9981   0.9948   0.9994
+## Prevalence             0.2845   0.1935   0.1744   0.1639   0.1838
+## Detection Rate         0.2842   0.1927   0.1728   0.1596   0.1833
+## Detection Prevalence   0.2850   0.1945   0.1772   0.1601   0.1833
+## Balanced Accuracy      0.9990   0.9969   0.9930   0.9865   0.9986</code></pre>
 <p>Now let’s see the predictions on the test set</p>
 <pre class="r"><code># predict outcomes using validation set
-(predict_rf &lt;- predict(modRF1, newdata=testing))</code></pre>
+(predict_rf &lt;- predict(modRF, newdata=testing))</code></pre>
 <pre><code>##  [1] B A B A A E D B A A B C B A E E A B B B
 ## Levels: A B C D E</code></pre>
 </div>
