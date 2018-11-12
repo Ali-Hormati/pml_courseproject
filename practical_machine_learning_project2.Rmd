@@ -1,0 +1,114 @@
+---
+title: "Practical Machine Learning Project"
+author: "Ali Hormati"
+date: "November 11, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.
+
+In this project, we will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participant They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+The five ways are exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). Only Class A corresponds to correct performance. The goal of this project is to predict the manner in which they did the exercise, i.e., Class A to E. 
+
+# Data Loading and Processing
+
+First, we load the required packages:
+
+```{r echo = FALSE}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+library(gbm)
+```
+
+
+We now load the training and testing data set from the source:
+
+```{r}
+if(!file.exists("pml-training.csv")){
+        train_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+        download.file(train_url, destfile="pml-training.csv")
+}
+# load data locally
+training <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!",""))
+
+
+if(!file.exists("pml-testing.csv")){
+        test_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+        download.file(test_url, destfile="pml-testing.csv")
+}
+# load data locally
+testing <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
+
+dim(training)
+dim(testing)
+        
+```
+
+# Cleaning the data
+
+
+We first remove the first 7 variables which has nothing to do with the prediction.
+
+```{r}
+
+dim(training)
+dim(testing)
+
+training <- training[, -c(1:7)]
+testing <- testing[, -c(1:7)]
+
+dim(training)
+dim(testing)
+```
+
+Now we remove columns which has more than 90% NA.
+
+```{r}
+na_cols <- colnames(training)[colSums(is.na(training))/dim(training)[1] > 0.9]
+
+training <- training[, -which(names(training) %in% na_cols)]
+testing <- testing[, -which(names(testing) %in% na_cols)]
+
+str(training)
+str(testing)
+
+dim(training)
+dim(testing)
+
+```
+
+
+
+# Prediction with Random Forest
+
+We use random forest for fitting a model and do prediction.
+
+```{r cache = TRUE}
+controlRF <- trainControl(verboseIter=FALSE)
+modRF1 <- train(classe ~ ., data=training, method="rf")
+modRF1$finalModel
+```
+
+```{r}
+print(modRF1)
+```
+
+The accuracy is almosty 1.
+
+Now let's see the predictions on the test set
+
+```{r}
+# predict outcomes using validation set
+(predict_rf <- predict(modRF1, newdata=testing))
+```
